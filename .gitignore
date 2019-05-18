@@ -1,0 +1,6 @@
+*.pyc
+
+mkxboxfs.sh
+mkxboxfs-mac.sh
+mkxboxfs-linux.sh
+

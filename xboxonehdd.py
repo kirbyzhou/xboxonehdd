@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# vi: set ts=4 sw=4 expandtab : #
 
 import os
 from stat import *
@@ -52,6 +53,30 @@ def print_parted_commands(device):
     f.flush()
     f.close()
     os.chmod('mkxboxfs.sh', 0o777)
+    
+    f = open('mkxboxfs-mac.sh', 'w')
+    f.write('#!/bin/bash\n')
+    f.write('DEV={0}\n'.format(device))
+    f.write('gpt create -f "$DEV"\n')
+    f.write('gpt add -i 1 -t windows -b {0} -s {1} "$DEV"\n'.format(1<<11,PARTITION_SIZES[0]>>9))
+    f.write('gpt add -i 2 -t windows -b {0} -s {1} "$DEV"\n'.format(temp_end<<11, PARTITION_SIZES[1]>>9))
+    f.write('gpt add -i 3 -t windows -b {0} -s {1} "$DEV"\n'.format(user_end<<11, PARTITION_SIZES[2]>>9))
+    f.write('gpt add -i 4 -t windows -b {0} -s {1} "$DEV"\n'.format(sys_end<<11, PARTITION_SIZES[3]>>9))
+    f.write('gpt add -i 5 -t windows -b {0} -s {1} "$DEV"\n'.format(upt_end<<11, PARTITION_SIZES[4]>>9))
+    f.write('gpt label -i 1 -l "\\"Temp Content\\"" "$DEV"\n')
+    f.write('gpt label -i 2 -l "\\"User Content\\"" "$DEV"\n')
+    f.write('gpt label -i 3 -l "\\"System Support\\"" "$DEV"\n')
+    f.write('gpt label -i 4 -l "\\"System Update\\"" "$DEV"\n')
+    f.write('gpt label -i 5 -l "\\"System Update 2\\"" "$DEV"\n')
+    #f.write('mkntfs -q "${DEV}2" -f -L "User Content"\n')
+    #f.write('mkntfs -q "${DEV}1" -f -L "Temp Content"\n')
+    #f.write('mkntfs -q "${DEV}3" -f -L "System Support"\n')
+    #f.write('mkntfs -q "${DEV}4" -f -L "System Update"\n')
+    #f.write('mkntfs -q "${DEV}5" -f -L "System Update 2"\n')
+    f.write('echo "Please format as NTFS under Windows"\n')
+    f.flush()
+    f.close()
+    os.chmod('mkxboxfs-mac.sh', 0o777)
 
 
 def fixup_header(hdr):
@@ -86,7 +111,16 @@ if __name__ == '__main__':
     partitions = disk.header.partition_table.active_partitions
 
     # calculate user partition size to nearest GiB
-    total_size = int(open(path.join('/sys', 'class', 'block', sys.argv[1], 'size'), 'r').readline()) * 512
+    if sys.platform == 'linux2': 
+        total_size = int(open(path.join('/sys', 'class', 'block', sys.argv[1], 'size'), 'r').readline()) * 512
+    elif sys.platform == 'darwin':
+        s = os.popen("diskutil info %s | fgrep 'Disk Size:' | sed 's/^.*(\\([0-9]*\\) Bytes).*$/\\1/'" % (sys.argv[1],),
+            "r", 1)
+        total_size=int(s.read())
+    else:
+        print "Unsupported platform: %s".format(sys.platform)
+        sys.exit(-1)
+
     user_content_size = (total_size - sum(PARTITION_SIZES))/1024/1024/1024
     PARTITION_SIZES[1] = user_content_size*1024*1024*1024
 
